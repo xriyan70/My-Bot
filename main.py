@@ -2,39 +2,63 @@ import telebot
 import requests
 import time
 from telebot import types
-import os
+from flask import Flask
+from threading import Thread
 
-# ১. আপনার সেটিংস
+# ১. সেটিংস
 API_TOKEN = '8678067992:AAEDkPkmtuz86YnrMJcnIVcp19tL52tkyRk'
 CHANNEL_USERNAME = '@developer_of_maruf' 
-# নিচের লিংকের জায়গায় আপনার GPLinks এর শর্ট করা লিংকটি বসাবেন
 GPLINK_AD = "https://gplinks.co/YourLink" 
 
 bot = telebot.TeleBot(API_TOKEN)
-user_data = {}
 
-# ২. জয়েন চেক ফাংশন
+# ২. বোটকে সচল রাখার জন্য ছোট একটি ওয়েব সার্ভার (Flask)
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+# --- আপনার বোটের বাকি কোড ---
+
 def check_join(chat_id):
     try:
         status = bot.get_chat_member(CHANNEL_USERNAME, chat_id).status
         return status in ['member', 'administrator', 'creator']
     except: return False
 
-# ৩. স্টার্ট কমান্ড
 @bot.message_handler(commands=['start'])
 def welcome(message):
     if check_join(message.chat.id):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("💰 টাকা ইনকাম করুন (ক্লিক)", url=GPLINK_AD))
-        msg = bot.send_message(message.chat.id, "✅ ভেরিফিকেশন সফল!\nএখন SMS পাঠাতে আপনার নাম্বারটি লিখুন:", reply_markup=markup)
+        msg = bot.send_message(message.chat.id, "✅ বোট সচল আছে!\nনাম্বার লিখুন:", reply_markup=markup)
         bot.register_next_step_handler(msg, get_number)
     else:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("📢 Join Channel", url="https://t.me/developer_of_maruf"))
         markup.add(types.InlineKeyboardButton("🔄 Verify Done", callback_data="verify"))
-        bot.send_message(message.chat.id, "❌ বোটটি ব্যবহার করতে আগে চ্যানেলে জয়েন করুন!", reply_markup=markup)
+        bot.send_message(message.chat.id, "❌ আগে জয়েন করুন!", reply_markup=markup)
 
-# ৪. ভেরিফাই বাটন
+# (বাকি মেসেজ হ্যান্ডলারগুলো একই থাকবে...)
+
+def get_number(message):
+    if not message.text or not message.text.isdigit(): return
+    bot.reply_to(message, "🔢 কতটি SMS পাঠাতে চান?")
+    # ... আপনার বাকি কোড লজিক ...
+
+# ৩. বোট চালু করার মূল অংশ
+if __name__ == "__main__":
+    keep_alive() # সার্ভার চালু করবে
+    print("বোট লাইভ হয়েছে...")
+    bot.infinity_polling()# ৪. ভেরিফাই বাটন
 @bot.callback_query_handler(func=lambda call: call.data == "verify")
 def verify(call):
     if check_join(call.message.chat.id):
