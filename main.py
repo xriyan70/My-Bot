@@ -2,22 +2,25 @@ import telebot
 import requests
 import time
 from telebot import types
+import os
 
-# আপনার সেটিংস
+# ১. আপনার সেটিংস
 API_TOKEN = '8678067992:AAEDkPkmtuz86YnrMJcnIVcp19tL52tkyRk'
 CHANNEL_USERNAME = '@developer_of_maruf' 
-# নিচের লিংকের জায়গায় আপনার GPLinks থেকে পাওয়া শর্ট লিংকটি বসাবেন
+# নিচের লিংকের জায়গায় আপনার GPLinks এর শর্ট করা লিংকটি বসাবেন
 GPLINK_AD = "https://gplinks.co/YourLink" 
 
 bot = telebot.TeleBot(API_TOKEN)
 user_data = {}
 
+# ২. জয়েন চেক ফাংশন
 def check_join(chat_id):
     try:
         status = bot.get_chat_member(CHANNEL_USERNAME, chat_id).status
         return status in ['member', 'administrator', 'creator']
     except: return False
 
+# ৩. স্টার্ট কমান্ড
 @bot.message_handler(commands=['start'])
 def welcome(message):
     if check_join(message.chat.id):
@@ -31,15 +34,17 @@ def welcome(message):
         markup.add(types.InlineKeyboardButton("🔄 Verify Done", callback_data="verify"))
         bot.send_message(message.chat.id, "❌ বোটটি ব্যবহার করতে আগে চ্যানেলে জয়েন করুন!", reply_markup=markup)
 
+# ৪. ভেরিফাই বাটন
 @bot.callback_query_handler(func=lambda call: call.data == "verify")
 def verify(call):
     if check_join(call.message.chat.id):
         bot.delete_message(call.message.chat.id, call.message.message_id)
-        bot.send_message(call.message.chat.id, "✅ সফল! এখন আপনার নাম্বারটি লিখুন:")
-        bot.register_next_step_handler(call.message, get_number)
+        msg = bot.send_message(call.message.chat.id, "✅ সফল! এখন আপনার নাম্বারটি লিখুন:")
+        bot.register_next_step_handler(msg, get_number)
     else:
         bot.answer_callback_query(call.id, "❌ আপনি এখনো জয়েন হননি!", show_alert=True)
 
+# ৫. নাম্বার ও এমাউন্ট নেওয়া
 def get_number(message):
     if not message.text or not message.text.isdigit() or len(message.text) < 11:
         msg = bot.reply_to(message, "❌ সঠিক ১১ ডিজিটের নাম্বার দিন:")
@@ -59,6 +64,8 @@ def get_amount(message):
         bot.send_message(message.chat.id, "✅ কাজ শেষ! আবার পাঠাতে /start দিন।")
     except: pass
 
+# ৬. আপনার জিজ্ঞাসিত অংশ (এটি সবার শেষে থাকবে)
 if __name__ == "__main__":
     print("বোট চালু হয়েছে...")
-    bot.infinity_polling()
+    # Render এর টাইম আউট সমস্যা এড়াতে এই সেটিংস
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
